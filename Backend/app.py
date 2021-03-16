@@ -1,9 +1,11 @@
 from flask import Flask
+from api import blueprint
 from DataBase import db_session
 
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'v!hT49JOc,Nob_Hp5urgx.D8Adfy1zS6n?YBPCsM'
+app.register_blueprint(blueprint)
 
 
 @app.route('/')

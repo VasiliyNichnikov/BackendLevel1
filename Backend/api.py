@@ -88,6 +88,39 @@ def login_user():
     return jsonify({'condition': 'success', 'parameters': {'key_user': user.key_user}})
 
 
+@blueprint.route('/delete_user', methods=['GET', 'POST'])
+def delete_user():
+    """
+        Удаление пользователя из БД
+        Для удаления нужно передать ключ пользователя
+    """
+    if not request.json:
+        return jsonify({'condition': 'error', 'parameters': {'key_error': '101', 'description': 'nothing passed'}})
+
+    answer = request.json
+    session = db_session.create_session()
+    if 'key_user' not in answer:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': '201', 'description': 'no required parameters for registration'}})
+
+    key_user = answer['key_user']
+    user = session.query(User).filter(User.key_user == key_user).first()
+
+    if user is None:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': '401',
+                                       'description': 'user not found'}})
+    # Получаем все продукты пользователя и если продукты есть, удаляем их из БД
+    user_products = user.products
+    if len(user_products) != 0:
+        for product in user_products:
+            session.delete(product)
+
+    session.delete(user)
+    session.commit()
+    return jsonify({'condition': 'success', 'parameters': {}})
+
+
 @blueprint.route('/add_product', methods=['GET', 'POST'])
 def add_product():
     """
@@ -176,3 +209,104 @@ def get_list_products():
         list_products.append(dict_product)
     return json.dumps({'condition': 'success', 'parameters': {'list_products': list_products}},
                       indent=4, cls=DateTimeEncoder)
+
+
+@blueprint.route('/edit_product', methods=['GET', 'POST'])
+def edit_product():
+    """
+        Редактирование продукта
+        Для редактирования товара нужно передать слудующие параметры:
+        1) ключ пользователя
+        2) id товара
+        Новые параметры:
+        2) дата покупки товара
+        3) название товара
+        4) цена товара
+    """
+    if not request.json:
+        return jsonify({'condition': 'error', 'parameters': {'key_error': '101', 'description': 'nothing passed'}})
+
+    answer = json.loads(request.data, object_hook=decode_datetime)
+    session = db_session.create_session()
+    if 'key_user' not in answer \
+            or 'id_product' not in answer \
+            or 'date_purchase' not in answer \
+            or 'name_product' not in answer \
+            or 'price_product' not in answer:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': '203',
+                                       'description': 'there are no necessary parameters for adding the product'}})
+
+    key_user, id_product, data_purchase, name_product, price_product = answer['key_user'], \
+                                                                       answer['id_product'], \
+                                                                       answer['date_purchase'], \
+                                                                       answer['name_product'], \
+                                                                       answer['price_product']
+
+    user = session.query(User).filter(User.key_user == key_user).first()
+    if user is None:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': '401',
+                                       'description': 'user not found'}})
+    product = session.query(Product).filter(Product.id == id_product, Product.user == user).first()
+    if product is None:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': '402',
+                                       'description': 'product not found'}})
+
+    if type(price_product) != float:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': 'TypeError',
+                                       'description': 'Type price_product != float'}})
+
+    try:
+        product.date_purchase = datetime.datetime(data_purchase.year, data_purchase.month, data_purchase.day)
+        product.name_product = name_product
+        product.price_product = price_product
+        session.commit()
+    except TypeError as e:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': 'TypeError',
+                                       'description': 'type error - %s' % e}})
+    except ValueError as e:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': 'ValueError',
+                                       'description': 'value error - %s' % e}})
+    return jsonify({'condition': 'success', 'parameters': {}})
+
+
+@blueprint.route('/delete_product', methods=['GET', 'POST'])
+def delete_product():
+    """
+        Удаление продукта из списка
+        Для удаления продукта нужно передать ключ пользователя и id товара
+    """
+    if not request.json:
+        return jsonify({'condition': 'error', 'parameters': {'key_error': '101', 'description': 'nothing passed'}})
+
+    answer = request.json
+    session = db_session.create_session()
+    if 'key_user' not in answer \
+            or 'id_product' not in answer:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': '203',
+                                       'description': 'there are no necessary parameters for adding the product'}})
+
+    key_user, id_product = answer['key_user'], answer['id_product']
+
+    user = session.query(User).filter(User.key_user == key_user).first()
+    if user is None:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': '401',
+                                       'description': 'user not found'}})
+
+    product = session.query(Product).filter(Product.id == id_product and Product.user_id == user.id).first()
+
+    if product is None:
+        return jsonify({'condition': 'error',
+                        'parameters': {'key_error': '402',
+                                       'description': 'product not found'}})
+
+    session.delete(product)
+    session.commit()
+    return jsonify({'condition': 'success', 'parameters': {}})

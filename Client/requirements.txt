@@ -1,0 +1,4 @@
+datetime
+requests
+PyQt5
+python-dateutil

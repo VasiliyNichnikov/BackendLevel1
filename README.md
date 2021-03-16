@@ -117,7 +117,7 @@
 
 ```json
 {
-    "key_user": "HvCwnxjLG>jJ1-c=Xy=YTT8WzM4qVBx@CJzDQz4E$aWV2iZTHJ",
+    "key_user": "key_user",
     "id_product": 6
 }
 ```
@@ -134,7 +134,7 @@
 
 ```json
 {
-    "key_user": "HvCwnxjLG>jJ1-c=Xy=YTT8WzM4qVBx@CJzDQz4E$aWV2iZTHJ"
+    "key_user": "key_user"
 }
 ```
 В случае успеха вернется сообщение, что аккаунт пользователя удален.

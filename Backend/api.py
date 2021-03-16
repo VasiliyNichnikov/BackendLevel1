@@ -46,6 +46,7 @@ def register_user():
     return jsonify({'condition': 'success', 'parameters': {'key_user': generate_key}})
 
 
+@blueprint.route('/login_user', methods=['GET', 'POST'])
 def login_user():
     """
         Вход в аккаунт

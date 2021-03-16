@@ -125,7 +125,7 @@ class Program(QMainWindow):
         super().__init__()
         self.__init_ui()
         # Создание класса, отвечающего за подключение к серверу
-        self.connecting_server = ConnectingServer('http://1f6b52e7f638.ngrok.io')
+        self.connecting_server = ConnectingServer('localhost:8000')
         # Путь до файла с json
         self.path_json = 'user_data.json'
         # Окна логина и регистрации

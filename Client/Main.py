@@ -73,6 +73,10 @@ class WidgetNote(QWidget):
 
     def __button_edit_input(self):
         self.read_only_on_off()
+
+        if self.name_product.text() == '':
+            self.name_product.setText('Product Name')
+
         if self.condition_edit:
             self.parent.edit_product(product_id=self.product_id, name_product=self.name_product.text(),
                                      price_product=self.convert_price(), date_purchase=self.convert_date())
@@ -93,17 +97,18 @@ class WidgetNote(QWidget):
 
     # Преобразовать дату
     def convert_date(self):
-        now = datetime.datetime.now()
-        hours, minutes = now.hour, now.minute
         day, month, year = self.date_purchase.text().split('.')
-        return f'{year}-{month}-{day} {hours}:{minutes}'
+        return datetime.datetime(int(year), int(month), int(day))
 
     # Преобразовать цену
     def convert_price(self):
         price = self.price_product.text()
-        if ',' in price:
-            return float(price.replace(',', '.'))
-        return float(price)
+        if price != '':
+            if ',' in price:
+                return float(price.replace(',', '.'))
+            return float(price)
+        self.price_product.setText('0.0')
+        return 0.0
 
 
 class QHLine(QFrame):
@@ -125,7 +130,7 @@ class Program(QMainWindow):
         super().__init__()
         self.__init_ui()
         # Создание класса, отвечающего за подключение к серверу
-        self.connecting_server = ConnectingServer('localhost:8000')
+        self.connecting_server = ConnectingServer('http://localhost:8000')
         # Путь до файла с json
         self.path_json = 'user_data.json'
         # Окна логина и регистрации
@@ -181,8 +186,9 @@ class Program(QMainWindow):
 
     # Добавление элемента в список
     def __add_element_list(self):
+        now = datetime.datetime.now()
         condition, parameters = self.add_product_server(name_product='Product Name',
-                                                        date_purchase=datetime.datetime(2000, 1, 1),
+                                                        date_purchase=datetime.datetime(now.year, now.month, now.day),
                                                         price_product=0.0)
         if condition:
             self.__add_product(parameters['id_product'])
@@ -193,14 +199,17 @@ class Program(QMainWindow):
         result = self.connecting_server.edit_product(key_user=self.key_user,
                                                      product_id=product_id,
                                                      name_product=name_product,
-                                                     data_purchase=date_purchase,
+                                                     date_purchase=date_purchase,
                                                      price_product=price_product)
-        if result.ok:
-            result_json = result.json()
-            if result_json['condition'] != 'success':
-                QMessageBox.critical(self, 'Ошибка', f'Ошибка при передачи параметров на сервер - '
-                                                     f'{result_json["parameters"]["key_error"]}', QMessageBox.Ok)
+        if result['condition'] != 'error':
+            if result['result'].ok:
+                result_json = result['result'].json()
+                if result_json['condition'] != 'success':
+                    QMessageBox.critical(self, 'Ошибка', f'Ошибка при передачи параметров на сервер - '
+                                                         f'{result_json["parameters"]["key_error"]}', QMessageBox.Ok)
 
+            else:
+                QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
         else:
             QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
 
@@ -220,9 +229,13 @@ class Program(QMainWindow):
     def remove_product_server(self, product_id):
         result = self.connecting_server.remove_product(key_user=self.key_user,
                                                        id_product=product_id)
-        if result.ok:
-            result_json = result.json()
-            return result_json['condition'] == 'success'
+        if result['condition'] != 'error':
+            if result['result'].ok:
+                result_json = result['result'].json()
+                return result_json['condition'] == 'success'
+            else:
+                QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
+                return False
         else:
             QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
             return False
@@ -264,13 +277,16 @@ class Program(QMainWindow):
     def add_product_server(self, name_product, date_purchase, price_product):
         result = self.connecting_server.add_product(key_user=self.key_user,
                                                     name_product=name_product,
-                                                    data_purchase=date_purchase,
+                                                    date_purchase=date_purchase,
                                                     price_product=price_product)
-        if result.ok:
-            condition = result.json()['condition']
-            parameters = result.json()['parameters']
-            # Продукт добавлен
-            return condition == 'success', parameters
+        if result['condition'] != 'error':
+            if result['result'].ok:
+                condition = result['result'].json()['condition']
+                parameters = result['result'].json()['parameters']
+                return condition == 'success', parameters
+            else:
+                QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
+                return False, None
         else:
             QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
             return False, None
@@ -309,23 +325,24 @@ class Program(QMainWindow):
             result = self.connecting_server.connect_user(login, password)
         else:
             result = self.connecting_server.register_user(login, password)
-
-        if result.ok:
-            result_json = result.json()
-            if result_json['condition'] == 'success':
-                key_user = result_json['parameters']['key_user']
-                self.__save_user_info({'login': login, 'key_user': key_user})
-                widget.closable = True
-                widget.close()
-                self.setEnabled(True)
-                # Загрузка данных из файла
-                self.load_key_and_login()
-                if not register_user:
-                    self.get_products_from_server()
-
+        if result['condition'] != 'error':
+            if result['result'].ok:
+                result_json = result['result'].json()
+                if result_json['condition'] == 'success':
+                    key_user = result_json['parameters']['key_user']
+                    self.__save_user_info({'login': login, 'key_user': key_user})
+                    widget.closable = True
+                    widget.close()
+                    self.setEnabled(True)
+                    # Загрузка данных из файла
+                    self.load_key_and_login()
+                    if not register_user:
+                        self.get_products_from_server()
+                else:
+                    QMessageBox.critical(self, 'Ошибка', f'Ошибка при передачи параметров на сервер - '
+                                                         f'{result_json["parameters"]["key_error"]}', QMessageBox.Ok)
             else:
-                QMessageBox.critical(self, 'Ошибка', f'Ошибка при передачи параметров на сервер - '
-                                                     f'{result_json["parameters"]["key_error"]}', QMessageBox.Ok)
+                QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
         else:
             QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
 
@@ -344,35 +361,41 @@ class Program(QMainWindow):
     # Удалить аккаунт из БД
     def __remove_user(self):
         result = self.connecting_server.remove_user(key_user=self.key_user)
-        if result.ok:
-            condition = result.json()['condition']
-            if condition == 'success':
-                self.__exit_user()
+        if result['condition'] != 'error':
+            if result['result'].ok:
+                condition = result['result'].json()['condition']
+                if condition == 'success':
+                    self.__exit_user()
+            else:
+                QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
         else:
             QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
 
     # Получение продуктов, которые есть на сервере у пользователя
     def get_products_from_server(self):
         result = self.connecting_server.get_products(key_user=self.key_user)
-        if result.ok:
-            result_json = json.loads(result.text, object_hook=decode_datetime)
-            if result_json['condition'] == 'success':
-                parameters = result_json['parameters']
-                for product in parameters['list_products']:
-                    element_product = self.__add_product(product['id_product'])
-                    element_product.condition_edit = False
-                    element_product.read_only_on_off()
-                    element_product.select_name_product(product['name_product'])
-                    element_product.select_price_product(str(product['price_product']))
-                    element_product.select_date_purchase(product['date_purchase'])
-                    self.__add_horizontal_line()
+        if result['condition'] != 'error':
+            if result['result'].ok:
+                result_json = json.loads(result['result'].text, object_hook=decode_datetime)
+                if result_json['condition'] == 'success':
+                    parameters = result_json['parameters']
+                    for product in parameters['list_products']:
+                        element_product = self.__add_product(product['id_product'])
+                        element_product.condition_edit = False
+                        element_product.read_only_on_off()
+                        element_product.select_name_product(product['name_product'])
+                        element_product.select_price_product(str(product['price_product']))
+                        element_product.select_date_purchase(product['date_purchase'])
+                        self.__add_horizontal_line()
+                else:
+                    parameters = result['result'].json()['parameters']
+                    # Данная ошибка сообщает о том, что пользователь не найден
+                    if parameters['key_error'] == '401':
+                        self.__exit_user()
+                    QMessageBox.critical(self, 'Ошибка', f'Ошибка при передачи параметров на сервер - '
+                                                         f'{parameters["key_error"]}', QMessageBox.Ok)
             else:
-                parameters = result.json()['parameters']
-                # Данная ошибка сообщает о том, что пользователь не найден
-                if parameters['key_error'] == '401':
-                    self.__exit_user()
-                QMessageBox.critical(self, 'Ошибка', f'Ошибка при передачи параметров на сервер - '
-                                                     f'{parameters["key_error"]}', QMessageBox.Ok)
+                QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
         else:
             QMessageBox.critical(self, 'Ошибка', 'Ошибка при подключении к серверу', QMessageBox.Ok)
 

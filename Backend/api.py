@@ -125,7 +125,7 @@ def delete_user():
 def add_product():
     """
         Добавление продукта в список пользователя
-        Для добавления товара нужно передать слудующие параметры:
+        Для добавления товара нужно передать следующие параметры:
         1) ключ пользователя
         2) дата покупки товара
         3) название товара
@@ -142,7 +142,6 @@ def add_product():
         return jsonify({'condition': 'error',
                         'parameters': {'key_error': '203',
                                        'description': 'there are no necessary parameters for adding the product'}})
-
     key_user, date_purchase, name_product, price_product = answer['key_user'], \
                                                            answer['date_purchase'], \
                                                            answer['name_product'], \
@@ -178,7 +177,7 @@ def add_product():
 def get_list_products():
     """
         Получение списка товаров пользователя
-        Для получения списка нужно отправить ключ пользовател
+        Для получения списка нужно отправить ключ пользователя
         При успешной работе, функция вернет список товаров
     """
     if not request.json:
@@ -190,7 +189,6 @@ def get_list_products():
         return jsonify({'condition': 'error',
                         'parameters': {'key_error': '204',
                                        'description': 'key_user not passed'}})
-
     key_user = answer['key_user']
     user = session.query(User).filter(User.key_user == key_user).first()
     if user is None:
@@ -215,7 +213,7 @@ def get_list_products():
 def edit_product():
     """
         Редактирование продукта
-        Для редактирования товара нужно передать слудующие параметры:
+        Для редактирования товара нужно передать следующие параметры:
         1) ключ пользователя
         2) id товара
         Новые параметры:
@@ -225,7 +223,6 @@ def edit_product():
     """
     if not request.json:
         return jsonify({'condition': 'error', 'parameters': {'key_error': '101', 'description': 'nothing passed'}})
-
     answer = json.loads(request.data, object_hook=decode_datetime)
     session = db_session.create_session()
     if 'key_user' not in answer \

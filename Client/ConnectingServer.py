@@ -1,14 +1,11 @@
 import requests
 import datetime
-import json
-from json import JSONEncoder
+from requests.exceptions import HTTPError, ConnectionError
 
 
-# Преобразовать в json
-class DateTimeEncoder(JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, (datetime.date, datetime.datetime)):
-            return obj.isoformat()
+def date_time_encoder(obj):
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
 
 
 class ConnectingServer:
@@ -17,39 +14,41 @@ class ConnectingServer:
         self.session = requests.Session()
 
     def connect_user(self, login, password):
-        answer = self.session.get(f'{self.url}/login_user', json={'login': login, 'password': password})
-        return answer
+        return self.__request_server(f'{self.url}/login_user', {'login': login, 'password': password})
 
     def register_user(self, login, password):
-        answer = self.session.get(f'{self.url}/register_user', json={'login': login, 'password': password})
-        return answer
+        return self.__request_server(f'{self.url}/register_user', {'login': login, 'password': password})
 
-    def add_product(self, key_user, name_product, price_product, data_purchase):
-        json_sent = json.dumps({'key_user': key_user,
-                                'date_purchase': data_purchase,
-                                'name_product': name_product,
-                                'price_product': price_product}, indent=4, cls=DateTimeEncoder)
-        answer = self.session.get(f'{self.url}/add_product', json=json_sent)
-        return answer
+    def add_product(self, key_user, name_product, price_product, date_purchase):
+        return self.__request_server(f'{self.url}/add_product', {'key_user': key_user,
+                                                                 'date_purchase': date_time_encoder(date_purchase),
+                                                                 'name_product': name_product,
+                                                                 'price_product': price_product})
 
     def get_products(self, key_user):
-        answer = self.session.get(f'{self.url}/get_list_products', json={'key_user': key_user})
-        return answer
+        return self.__request_server(f'{self.url}/get_list_products', {'key_user': key_user})
 
     def remove_product(self, key_user, id_product):
-        answer = self.session.get(f'{self.url}/delete_product', json={'key_user': key_user, 'id_product': id_product})
-        return answer
+        return self.__request_server(f'{self.url}/delete_product', {'key_user': key_user, 'id_product': id_product})
 
     def remove_user(self, key_user):
-        answer = self.session.get(f'{self.url}/delete_user', json={'key_user': key_user})
-        return answer
+        return self.__request_server(f'{self.url}/delete_user', {'key_user': key_user})
 
-    def edit_product(self, key_user, product_id, name_product, price_product, data_purchase):
-        json_sent = json.dumps({'key_user': key_user,
-                                'id_product': product_id,
-                                'date_purchase': data_purchase,
-                                'name_product': name_product,
-                                'price_product': price_product}, indent=4, cls=DateTimeEncoder)
-        answer = self.session.get(f'{self.url}/edit_product', json=json_sent)
-        return answer
+    def edit_product(self, key_user, product_id, name_product, price_product, date_purchase):
+        return self.__request_server(f'{self.url}/edit_product', {'key_user': key_user,
+                                                                  'id_product': product_id,
+                                                                  'date_purchase': date_time_encoder(date_purchase),
+                                                                  'name_product': name_product,
+                                                                  'price_product': price_product})
 
+    def __request_server(self, source, json_sent):
+        try:
+            answer = self.session.get(source, json=json_sent)
+            return {'condition': 'success', 'result': answer}
+        except HTTPError as http_err:
+            print(f'HTTP error occurred: {http_err}')
+        except Exception as err:
+            print(f'Other error occurred: {err}')
+        except ConnectionError as connection_error:
+            print(f'Connection error: {connection_error}')
+        return {'condition': 'error'}

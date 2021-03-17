@@ -137,7 +137,7 @@ class Program(QMainWindow):
         self.window_login = None
         self.window_register = None
 
-        # Проверка, что ключ пользовател существует
+        # Проверка, что ключ пользователь существует
         self.load_key_and_login()
         if self.key_user == '':
             self.setEnabled(False)
